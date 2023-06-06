@@ -242,10 +242,6 @@ def get_end_interval_w(filename, min_IOU, delta):
     return w
 
 
-
-
-
-
 # Returns the maximum difference between x-coordinate / y-coordinate of a detection and its chosen ground truth for a given image
 # Used for generating prediction sets around the centers of detections 
 def get_max_width_and_height(chosen_dets_filled, det_to_gt, det_list, gt_list):
@@ -262,8 +258,28 @@ def get_max_width_and_height(chosen_dets_filled, det_to_gt, det_list, gt_list):
             max_height = max(max_height, np.abs(det_center[1] - gt_center[1]))
     
     return (max_width, max_height)
-            
 
+def get_bbox_center_bounds(filename, min_IOU, delta):
+    with open(filename, 'rb') as f:
+        results = pickle.load(f)
+    max_width_list = list()
+    max_height_list = list()
+    for i, val in enumerate(results):
+        if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
+            continue
+        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['bbox_gt'], min_IOU)
+        gt_to_det, chosen_dets = map_gt_to_det(val['bbox_gt'], gt_to_det_dict, val['score_det_raw'])
+        chosen_dets_filled = fill_chosen_dets(chosen_dets, results[i]['bbox_det_raw'])
+        max_width, max_height = get_max_width_and_height(chosen_dets_filled, det_to_gt, val['bbox_det_raw'], val['bbox_gt'])
+        max_width_list.append(max_width)
+        max_height_list.append(max_height)
+    
+    bound_delta = delta / 2
+    width_w = get_c_width(bound_delta, max_width_list)
+    height_w = get_c_width(bound_delta, max_height_list)
+
+    return (width_w, height_w)
+            
 
 def main():
     filename = '/home/sangdonp/data/tmp/results_coco_val.pk'

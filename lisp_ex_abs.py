@@ -153,13 +153,19 @@ def fold_fn_abs(args, inp):
     else:
         # Check boolean flag of first element of abstract list
         (x, flag) = xs[0]
+        intermediate_fold = fold_fn_abs((f, xs[1:], b), inp)
         if flag == 1: 
-            return fold_fn_abs((f, xs[1:], f(x, b)), inp)
+            return f(x, intermediate_fold)
+            # return fold_fn_abs((f, xs[1:], f(x, b)), inp)
+        elif flag == 0:
+            return intermediate_fold
         else:
-            # In this case, b = '?'
+            # In this case, flag = '?'
             return join(
-                fold_fn_abs((f, xs[1:], b), inp),
-                fold_fn_abs((f, xs[1:], f(x, b)), inp)
+                intermediate_fold,
+                f(x, intermediate_fold)
+                # fold_fn_abs((f, xs[1:], b), inp),
+                # fold_fn_abs((f, xs[1:], f(x, b)), inp)
             )
 
 def f0(args, inp):

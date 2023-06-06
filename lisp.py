@@ -72,6 +72,9 @@ def is_number(s):
         return True
     except ValueError:
         return False
+    
+
+# Functions for extracting intermediate program point values
 
 def execute_with_intermediate_values(expr, inp, fns, outp_dict):
     args = []
