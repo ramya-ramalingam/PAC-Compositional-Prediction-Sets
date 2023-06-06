@@ -61,6 +61,9 @@ def plus_fn(args, inp):
 def ge_fn(args, inp):
     return lambda x, y: x >= y
 
+def le_fn(args, inp):
+    return lambda x, y: x <= y
+
 def input_fn(args, inp):
     return inp
 
@@ -78,6 +81,7 @@ def get_fns():
         # functions
         'plus': plus_fn,
         'ge': ge_fn,
+        'le': le_fn,
 
         # inputs
         'input': input_fn,
@@ -86,6 +90,9 @@ def get_fns():
         '0': lambda args, inp: 0,
         '1': lambda args, inp: 1,
         '2': lambda args, inp: 2,
+        '100': lambda args, inp: 100,
+        'MAX_WIDTH': lambda args, inp: 640,
+        'MAX_HEIGHT': lambda args, inp: 480,
     }
 
 if __name__ == '__main__':

@@ -1,9 +1,6 @@
 from lisp import * 
 import lisp_ex as concrete
 
-
-
-
 def alpha(x):
     # Abstraction function
     if isinstance(x, bool):
@@ -47,6 +44,9 @@ def plus_curry_abs(args, inp):
 
 def ge_curry_abs(args, inp):
     return lambda x, y: 1 if x[0] >= y[1] else (0 if y[0] > x[1] else '?')
+
+def le_curry_abs(args, inp):
+    return lambda x, y: 1 if x[0] <= y[1] else (0 if y[0] < x[1] else '?')
 
 def plus_fn_abs(args, inp):
     (l1, u1), (l2, u2) = args
@@ -184,6 +184,7 @@ def get_fns_abs():
         'plus_uncurried': plus_fn_abs,
         'ge': ge_curry_abs,
         'ge_uncurried': ge_fn_abs,
+        'le': le_curry_abs,
 
         # inputs
         'input': input_fn,
@@ -194,6 +195,7 @@ def get_fns_abs():
 
         # constants
         '-100': lambda args, inp: (-100, -100),
+        '100': lambda args, inp: (100, 100),
         '0': lambda args, inp: (0, 0),
         '1': lambda args, inp: (1, 1),
         '2': lambda args, inp: (2, 2),
@@ -202,6 +204,8 @@ def get_fns_abs():
         '1,3': lambda args, inp: (1, 3),
         '3,4': lambda args, inp: (3, 4),
         '3,5': lambda args, inp: (3, 5),
+        'MAX_WIDTH': lambda args, inp: (640, 640),
+        'MAX_HEIGHT': lambda args, inp: (480, 480),
     }
 
 if __name__ == '__main__':

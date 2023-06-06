@@ -5,6 +5,9 @@ from main_det_coco import COCO_INSTANCE_CATEGORY_NAMES
 from torchvision.ops import box_iou
 import torch
 
+MAX_WIDTH = 640
+MAX_HEIGHT = 480
+
 # Function to calculate area of a bounding box. Assumes input is tensor of the form 
 # [xmin, ymin, xmax, ymax]
 def get_area(bbox):
@@ -143,6 +146,31 @@ def get_left_images(bboxes, pixel_no):
             num_gt += 1
     return num_gt
 
+def get_bottom_images(bboxes, pixel_no):
+    num_gt = 0
+    for i, val in enumerate(bboxes):
+        curr_center = get_center(val)
+        if curr_center[1] < pixel_no:
+            num_gt += 1
+    return num_gt
+
+def get_top_images(bboxes, pixel_no):
+    num_gt = 0
+    for i, val in enumerate(bboxes):
+        curr_center = get_center(val)
+        if curr_center[1] >  MAX_HEIGHT - pixel_no:
+            num_gt += 1
+    return num_gt
+
+def get_right_images(bboxes, pixel_no):
+    num_gt = 0
+    for i, val in enumerate(bboxes):
+        curr_center = get_center(val)
+        if curr_center[0] >  MAX_WIDTH - pixel_no:
+            num_gt += 1
+    return num_gt
+
+# Function which does everything done in main() - for imports
 def get_bounds(filename, min_IOU, delta):
     with open(filename, 'rb') as f:
         results = pickle.load(f)
@@ -161,19 +189,6 @@ def get_bounds(filename, min_IOU, delta):
             unused_count += 1
             continue
     
-        
-        # Don't include any images with small ground truth bounding boxes
-        # flag_c = 0
-        # for k, gt in enumerate(val['bbox_gt']):
-        #     if is_small(gt, small_area):
-        #         flag_c = 1
-        #         break
-
-        # if flag_c == 1:
-        #     small_count += 1
-        #     continue
-            
-        # print('Got here: ' + str(i))
         # 1. For each result, map every bounding box detection to a ground-truth bounding box. Do this on the basis of 
         #    IoU metric - Area of overlap / Area of union = Area of overlap / (Ground truth area + Predicted Box area - Area of overlap)
         #    https://learnopencv.com/intersection-over-union-iou-in-object-detection-and-segmentation/
@@ -206,10 +221,28 @@ def get_bounds(filename, min_IOU, delta):
     #    calibration data. This can be used with direct conformal prediction approaches to get a quantile value for each ((1) and (2)),  
     #    which can be used to select "uncertain" bounding boxes - those with a confidence value in the interval [(1), (2)] in test data
     # lc_quantile = get_conformal_quantile(lowest_confidence_list, 1 - delta)
-    lc_quantile = get_conformal_quantile(lowest_confidence_neg, delta)
-    print(lowest_confidence_list)
-    hic_quantile = get_conformal_quantile(highest_inconfidence_list, delta)
+    bound_delta = delta / 2
+    lc_quantile = get_conformal_quantile(lowest_confidence_neg, bound_delta)
+    hic_quantile = get_conformal_quantile(highest_inconfidence_list, bound_delta)
     return lc_quantile, hic_quantile
+
+def get_end_interval_w(filename, min_IOU, delta):
+    with open(filename, 'rb') as f:
+        results = pickle.load(f)
+    residuals = list()
+    for i, val in enumerate(results):
+        if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
+            continue
+        # No. of ground truth detections in image
+        true_no = val['bbox_gt'].nelement() / 4
+        # Predicted number of image detections in image
+        predicted_no = val['bbox_det_raw'].nelement() / 4
+        residuals.append(np.abs(true_no - predicted_no))
+    w = get_c_width(delta, residuals)
+    return w
+
+
+
 
 
 
@@ -247,37 +280,20 @@ def main():
     max_height_list = list()
     residuals = list()
     bad_list = list()
-    delta = 0.1
+    delta = 0.2
     unused_count = 0
-    small_count = 0
-    x = 0
     for i, val in enumerate(results):
 
         if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
             print('No ground truths: ' + str(i))
             unused_count += 1
             continue
-    
-        
-        # Don't include any images with small ground truth bounding boxes
-        # flag_c = 0
-        # for k, gt in enumerate(val['bbox_gt']):
-        #     if is_small(gt, small_area):
-        #         flag_c = 1
-        #         break
 
-        # if flag_c == 1:
-        #     small_count += 1
-        #     continue
-            
-        # print('Got here: ' + str(i))
         # 1. For each result, map every bounding box detection to a ground-truth bounding box. Do this on the basis of 
         #    IoU metric - Area of overlap / Area of union = Area of overlap / (Ground truth area + Predicted Box area - Area of overlap)
         #    https://learnopencv.com/intersection-over-union-iou-in-object-detection-and-segmentation/
 
         det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['bbox_gt'], min_IOU)
-        # print(det_to_gt)
-        # print(gt_to_det_dict)
 
         # 2. For each ground-truth g, there is now a set of predictions S which map to it. Among these, find the one with the highest
         #    confidence score, and map the ground-truth back to it. This is the corresponding "correct" bounding-box for that ground truth.
@@ -305,26 +321,22 @@ def main():
         max_width_list.append(max_width)
         max_height_list.append(max_height)
 
-        # 4b. Get residual for this example (difference between GT and number of bounding boxes)
-        true_no = val['bbox_gt'].nelement() / 4
-        predicted_no = val['bbox_det_raw'].nelement() / 4
-        true_no = get_left_images(val['bbox_gt'], 100)
-        predicted_no = get_left_images(val['bbox_det_raw'], 100)
+        # 4b (special). Get residual for baseline (difference between GT and number of bounding boxes)
+        true_no = get_top_images(val['bbox_gt'], 100)
+        predicted_no = get_top_images(val['bbox_det_raw'], 100)
         residuals.append(np.abs(true_no - predicted_no))
     
     # 5. We get a set of scores for both "lowest confidence of correctness" and "highest confidence of incorrectness" from the
     #    calibration data. This can be used with direct conformal prediction approaches to get a quantile value for each ((1) and (2)),  
     #    which can be used to select "uncertain" bounding boxes - those with a confidence value in the interval [(1), (2)] in test data
-    # lc_quantile = get_conformal_quantile(lowest_confidence_list, 1 - delta)
-    lc_quantile = get_conformal_quantile(lowest_confidence_neg, delta)
-    hic_quantile = get_conformal_quantile(highest_inconfidence_list, delta)
+    bound_delta = delta / 2
+    lc_quantile = get_conformal_quantile(lowest_confidence_neg, bound_delta)
+    hic_quantile = get_conformal_quantile(highest_inconfidence_list, bound_delta)
     w = get_c_width(delta, residuals)
-    width_w = get_c_width(delta, max_width_list)
-    height_w = get_c_width(delta, max_height_list)
-    print('Actual quantiles:')
+    width_w = get_c_width(bound_delta, max_width_list)
+    height_w = get_c_width(bound_delta, max_height_list)
     print("Lowest confidence: ", str(-1 * lc_quantile))
     print("Highest inconfidence: ", str(hic_quantile))
-    print(w)
     print("Conformal Width: " + str(w))
     print("Max Width for Centers: " + str(width_w))
     print("Max Height for Centers: " + str(height_w))
