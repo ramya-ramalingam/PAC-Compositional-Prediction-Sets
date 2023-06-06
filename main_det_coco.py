@@ -61,7 +61,7 @@ def main(args):
     print()
 
     
-    ##---- learning
+    # ##---- learning
     print('##---- learn a detector')
     l = learning.DetLearner(mdl, args.train)
     print("## train...skip")
@@ -72,115 +72,116 @@ def main(args):
         l.test(ds_tar.test, ld_name=args.data.tar, verbose=True)
     print()
 
-    ## --- filter unused labels
+    # ## --- filter unused labels
     mdl = model.FilterLabel(mdl, target_labels=args.data.target_labels) # only see selected labels
     
-    ##---- prediction set estimation and/or calibration
-    if args.estimate:
-        assert(args.train_predset.method == 'pac_predset')
+    # ##---- prediction set estimation and/or calibration
+    # if args.estimate:
+    #     assert(args.train_predset.method == 'pac_predset')
 
-        ## count objects in validation set
-        n = 0
-        for x, y in ds_tar.val:
-            n += np.sum([len(y_i['labels']) for y_i in y])
-        print(f'# number of objects in the calibration set = {n}')
-        args.model_predset.n = n
+    #     ## count objects in validation set
+    #     n = 0
+    #     for x, y in ds_tar.val:
+    #         n += np.sum([len(y_i['labels']) for y_i in y])
+    #     print(f'# number of objects in the calibration set = {n}')
+    #     args.model_predset.n = n
         
-        ##---- proposal: eps=0.09
-        if args.estimate_proposal:
-            print('##---- prediction set for the proposal predictor')
+    #     ##---- proposal: eps=0.09
+    #     if args.estimate_proposal:
+    #         print('##---- prediction set for the proposal predictor')
 
-            ## proposal data loader
-            dsld_src_prp = model.DetectionDatasetLoader(model.ProposalView(mdl), ds_src, args.train_predset.device, ideal=False)
-            dsld_tar_prp = model.DetectionDatasetLoader(model.ProposalView(mdl), ds_tar, args.train_predset.device, ideal=False)
+    #         ## proposal data loader
+    #         dsld_src_prp = model.DetectionDatasetLoader(model.ProposalView(mdl), ds_src, args.train_predset.device, ideal=False)
+    #         dsld_tar_prp = model.DetectionDatasetLoader(model.ProposalView(mdl), ds_tar, args.train_predset.device, ideal=False)
 
-            ## prediction set estimation
-            mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n) #TODO: simplify
-            l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
-            l.train(dsld_src_prp.val, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
-            _, error_prp = l.test(dsld_tar_prp.test, ld_name=args.data.tar, verbose=True)
-            print()
+    #         ## prediction set estimation
+    #         mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n) #TODO: simplify
+    #         l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
+    #         l.train(dsld_src_prp.val, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
+    #         _, error_prp = l.test(dsld_tar_prp.test, ld_name=args.data.tar, verbose=True)
+    #         print()
         
         
-        ##---- objectness: eps=0.02
-        if args.estimate_objectness:
-            print('##---- prediction set for the class predictor')
-            ## class data loader
-            dsld_src_obj = model.DetectionDatasetLoader(model.ObjectnessView(mdl), ds_src, args.train_predset.device, ideal=True)
-            dsld_tar_obj = model.DetectionDatasetLoader(model.ObjectnessView(mdl), ds_tar, args.train_predset.device, ideal=True)
+    #     ##---- objectness: eps=0.02
+    #     if args.estimate_objectness:
+    #         print('##---- prediction set for the class predictor')
+    #         ## class data loader
+    #         dsld_src_obj = model.DetectionDatasetLoader(model.ObjectnessView(mdl), ds_src, args.train_predset.device, ideal=True)
+    #         dsld_tar_obj = model.DetectionDatasetLoader(model.ObjectnessView(mdl), ds_tar, args.train_predset.device, ideal=True)
 
-            ## prediction set estimation
-            mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj) #TODO: simplify
-            l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
-            l.train(dsld_src_obj.val, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
-            _, error_obj = l.test(dsld_tar_obj.test, ld_name=args.data.tar, verbose=True)
-            print()
+    #         ## prediction set estimation
+    #         mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj) #TODO: simplify
+    #         l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
+    #         l.train(dsld_src_obj.val, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
+    #         _, error_obj = l.test(dsld_tar_obj.test, ld_name=args.data.tar, verbose=True)
+    #         print()
 
         
-        ##---- location: eps=0.09
-        if args.estimate_location:
-            print('##---- prediction set for the location predictor')
-            dsld_src_loc = model.DetectionDatasetLoader(model.LocationView(mdl), ds_src, args.train_predset.device, ideal=True)
-            dsld_tar_loc = model.DetectionDatasetLoader(model.LocationView(mdl), ds_tar, args.train_predset.device, ideal=True)
+    #     ##---- location: eps=0.09
+    #     if args.estimate_location:
+    #         print('##---- prediction set for the location predictor')
+    #         dsld_src_loc = model.DetectionDatasetLoader(model.LocationView(mdl), ds_src, args.train_predset.device, ideal=True)
+    #         dsld_tar_loc = model.DetectionDatasetLoader(model.LocationView(mdl), ds_tar, args.train_predset.device, ideal=True)
 
-            ## prediction set estimation
-            mdl_loc_ps = model.PredSetBox(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
-            l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
-            l.train(dsld_src_loc.val, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
-            _, error_loc = l.test(dsld_tar_loc.test, ld_name=args.data.tar, verbose=True)
-            print()
+    #         ## prediction set estimation
+    #         mdl_loc_ps = model.PredSetBox(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
+    #         l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
+    #         l.train(dsld_src_loc.val, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True))
+    #         _, error_loc = l.test(dsld_tar_loc.test, ld_name=args.data.tar, verbose=True)
+    #         print()
             
-        ##---- evaluate a composed model
-        print('##---- compose all prediction sets')
-        mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n_prp)
-        l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
-        l.train(None, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
-        mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj)
-        l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
-        l.train(None, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
-        mdl_loc_ps = model.PredSetReg(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
-        l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
-        l.train(None, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    #     ##---- evaluate a composed model
+    #     print('##---- compose all prediction sets')
+    #     mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n_prp)
+    #     l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
+    #     l.train(None, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    #     mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj)
+    #     l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
+    #     l.train(None, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    #     mdl_loc_ps = model.PredSetReg(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
+    #     l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
+    #     l.train(None, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
             
-        mdl_det_ps = model.PredSetDet(mdl, mdl_prp_ps, mdl_obj_ps, mdl_loc_ps, args.data.target_labels)
-        l = uncertainty.PredSetConstructor_BC(mdl_det_ps, args.train_predset, name_postfix='det')
-        _, error_det = l.test(ds_tar.test, ld_name=args.data.tar, verbose=True)
+    #     mdl_det_ps = model.PredSetDet(mdl, mdl_prp_ps, mdl_obj_ps, mdl_loc_ps, args.data.target_labels)
+    #     l = uncertainty.PredSetConstructor_BC(mdl_det_ps, args.train_predset, name_postfix='det')
+    #     _, error_det = l.test(ds_tar.test, ld_name=args.data.tar, verbose=True)
 
-        ## save error
-        if args.estimate_proposal and args.estimate_objectness and args.estimate_location:
-            pickle.dump({'error_prp': error_prp.detach().cpu().numpy(),
-                         'error_obj': error_obj.detach().cpu().numpy(),
-                         'error_loc': error_loc.detach().cpu().numpy(),
-                         'error_det': error_det.detach().cpu().numpy(),
-                         'eps_prp': args.model_predset_prp.eps, 'eps_obj': args.model_predset_obj.eps, 'eps_loc': args.model_predset_loc.eps,
-                         'eps': args.model_predset.eps,
-                         'delta': args.model_predset.delta,
-                    }, open(os.path.join(args.snapshot_root, args.exp_name, 'det_error_stats.pk'), 'wb'))
-            #plot_error_det([error_prp, error_obj, error_loc, error_det],
+    #     ## save error
+    #     if args.estimate_proposal and args.estimate_objectness and args.estimate_location:
+    #         pickle.dump({'error_prp': error_prp.detach().cpu().numpy(),
+    #                      'error_obj': error_obj.detach().cpu().numpy(),
+    #                      'error_loc': error_loc.detach().cpu().numpy(),
+    #                      'error_det': error_det.detach().cpu().numpy(),
+    #                      'eps_prp': args.model_predset_prp.eps, 'eps_obj': args.model_predset_obj.eps, 'eps_loc': args.model_predset_loc.eps,
+    #                      'eps': args.model_predset.eps,
+    #                      'delta': args.model_predset.delta,
+    #                 }, open(os.path.join(args.snapshot_root, args.exp_name, 'det_error_stats.pk'), 'wb'))
+    #         #plot_error_det([error_prp, error_obj, error_loc, error_det],
                        
     
     ## visualize results
     n_vis = np.inf    
     i = 1
 
-    mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n_prp)
-    l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
-    l.train(None, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
-    mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj)
-    l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
-    l.train(None, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
-    mdl_loc_ps = model.PredSetReg(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
-    l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
-    l.train(None, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    # mdl_prp_ps = model.PredSetPrp(model.Dummy()) #, args.model_predset_prp.eps, args.model_predset.delta_comp, args.model_predset.n_prp)
+    # l = uncertainty.PredSetConstructor_BC(mdl_prp_ps, args.train_predset, name_postfix='prp')
+    # l.train(None, types.SimpleNamespace(n=args.model_predset.n_prp, eps=args.model_predset_prp.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    # mdl_obj_ps = model.PredSetCls(model.Dummy()) #, args.model_predset_obj.eps, args.model_predset.delta_comp, args.model_predset.n_obj)
+    # l = uncertainty.PredSetConstructor_BC(mdl_obj_ps, args.train_predset, name_postfix='obj')
+    # l.train(None, types.SimpleNamespace(n=args.model_predset.n_obj, eps=args.model_predset_obj.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
+    # mdl_loc_ps = model.PredSetReg(model.Dummy()) #, args.model_predset_loc.eps, args.model_predset.delta_comp, args.model_predset.n_loc)
+    # l = uncertainty.PredSetConstructor_BC(mdl_loc_ps, args.train_predset, name_postfix='loc')
+    # l.train(None, types.SimpleNamespace(n=args.model_predset.n_loc, eps=args.model_predset_loc.eps, delta=args.model_predset.delta_comp, verbose=True, save=True)) # load a model
 
-    mdl_det_ps = model.PredSetDet(mdl, mdl_prp_ps, mdl_obj_ps, mdl_loc_ps, args.data.target_labels)
-
+    # mdl_det_ps = model.PredSetDet(mdl, mdl_prp_ps, mdl_obj_ps, mdl_loc_ps, args.data.target_labels)
+    mdl.eval()
+    ground_truths = []
     results = []
     for images, targets in ds_tar.test:
         images = [img for img in learning.to_device(images, args.device)]
         with tc.no_grad():
             # prediction set results
-            locs_ps, labels_ps = mdl_det_ps(images)
+            # locs_ps, labels_ps = mdl_det_ps(images)
 
             # original detection prediction
             pred = mdl(images)
@@ -194,19 +195,20 @@ def main(args):
             # ground truth
             locs_gt = [t['boxes'] for t in targets]
             labels_gt = [t['labels'] for t in targets]
-
-        for image, loc, label, loc_gt, label_gt, loc_pred, label_pred, loc_pred_all, label_pred_all, score_pred_all in \
-            zip(images, locs_ps, labels_ps, locs_gt, labels_gt, locs_pred, labels_pred, locs_pred_all, labels_pred_all, scores_pred_all):
-            image, loc, loc_pred, loc_gt = image.cpu(), loc.cpu(), loc_pred.cpu(), loc_gt.cpu()
-            label, label_pred, loc_gt = label.cpu(), label_pred.cpu(), loc_gt.cpu()
+            # named: loc, label - to remove
+        for image, loc_gt, label_gt, loc_pred, label_pred, loc_pred_all, label_pred_all, score_pred_all in \
+            zip(images, locs_gt, labels_gt, locs_pred, labels_pred, locs_pred_all, labels_pred_all, scores_pred_all):
+            # image, loc, loc_pred, loc_gt = image.cpu(), loc.cpu(), loc_pred.cpu(), loc_gt.cpu()
+            image, loc_pred, loc_gt = image.cpu(), loc_pred.cpu(), loc_gt.cpu()
+            # label, label_pred, loc_gt = label.cpu(), label_pred.cpu(), loc_gt.cpu()
+            label_pred, loc_gt = label_pred.cpu(), loc_gt.cpu()
             loc_pred_all, label_pred_all, score_pred_all = loc_pred_all.cpu(), label_pred_all.cpu(), score_pred_all.cpu()
-
             # result summary: all boxes are in (xmin, ymin, xmax, ymax) format
             # target classes are "person" and "car"
             result = {
                 'image': image,
-                'bbox_ps': loc, # the postprocessed location prediction set: the tightest bounding box that contains all bounding boxes in the prediction set
-                'label_ps': label, # the postprocessed label prediction set: the object label when the label prediction set contains the "valid" label
+                # 'bbox_ps': loc, # the postprocessed location prediction set: the tightest bounding box that contains all bounding boxes in the prediction set
+                # 'label_ps': label, # the postprocessed label prediction set: the object label when the label prediction set contains the "valid" label
                 'bbox_det': loc_pred, # bounding boxes from the object detector when score >= 0.5 
                 'label_det': label_pred, # labels of the bounding boxes when score >= 0.5
                 'bbox_det_raw': loc_pred_all, # bounding boxes from the object detector
@@ -220,26 +222,36 @@ def main(args):
                 print(f'{k} =', v, v.shape)
             print()
 
-        #     # plot results and save
-        #     colors = ['green']*len(loc) + ['white']*len(loc_gt) + ['red']*len(loc_pred)
-        #     loc_plot = tc.cat([loc, loc_gt, loc_pred], 0)
-        #     label_plot = [' '+COCO_INSTANCE_CATEGORY_NAMES[l] for l in tc.cat([label, label_gt, label_pred])]
+            # plot results and save
+            # colors = ['green']*len(loc) + ['white']*len(loc_gt) + ['red']*len(loc_pred)
+            colors = ['white'] * len(loc_gt) + ['red']*len(loc_pred)
+            # loc_plot = tc.cat([loc, loc_gt, loc_pred], 0)
+            loc_plot = tc.cat([loc_gt, loc_pred], 0)
+            # label_plot = [' '+COCO_INSTANCE_CATEGORY_NAMES[l] for l in tc.cat([label, label_gt, label_pred])]
+            label_plot = [' '+COCO_INSTANCE_CATEGORY_NAMES[l] for l in tc.cat([label_gt, label_pred])]
 
-        #     image_boxes = tv.utils.draw_bounding_boxes(
-        #         (image*255).byte(),
-        #         loc_plot,
-        #         label_plot,
-        #         colors=colors,
-        #         width=3,
-        #     )
-        #     image_boxes = (image_boxes/255.0).float()
-        #     fn = os.path.join(args.snapshot_root, args.exp_name, 'figs', 'predset', f'{i}.png')
-        #     print(fn)
-        #     os.makedirs(os.path.dirname(fn), exist_ok=True)
-        #     tv.utils.save_image(image_boxes, fn)
-        #     i += 1
-        # if i > n_vis:
-        #     break
+            # image_boxes = tv.utils.draw_bounding_boxes(
+            #     (image*255).byte(),
+            #     loc_plot,
+            #     label_plot,
+            #     colors=colors,
+            #     width=3,
+            # )
+            image_boxes = tv.utils.draw_bounding_boxes(
+                (image*255).byte(),
+                loc_plot,
+                label_plot,
+                colors=colors,
+                width=2,
+            )
+            image_boxes = (image_boxes/255.0).float()
+            fn = os.path.join(args.snapshot_root, args.exp_name, 'figs', 'predset', f'{i}.png')
+            print(fn)
+            os.makedirs(os.path.dirname(fn), exist_ok=True)
+            tv.utils.save_image(image_boxes, fn)
+            i += 1
+        if i > n_vis:
+            break
     
     pickle.dump(results, open('results_coco_test.pk', 'wb'))
 
@@ -375,7 +387,6 @@ def parse_args():
     
     
     return args    
-    
 
 if __name__ == '__main__':
     args = parse_args()

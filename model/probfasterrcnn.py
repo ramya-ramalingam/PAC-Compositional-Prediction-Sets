@@ -10,7 +10,11 @@ import torch.nn.functional as F
 
 from torchvision.models.detection.roi_heads import *
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, AnchorGenerator, MultiScaleRoIAlign, RPNHead, TwoMLPHead, GeneralizedRCNNTransform, load_state_dict_from_url, model_urls
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor, AnchorGenerator, MultiScaleRoIAlign, RPNHead, TwoMLPHead, GeneralizedRCNNTransform, model_urls
+try: 
+    from torch.hub import load_state_dict_from_url
+except ImportError:
+    from torch.utils.model_zoo import load_url as load_state_dict_from_url
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 from torchvision.models.detection.transform import resize_boxes
 
@@ -494,6 +498,12 @@ class ProbRoIHeads(RoIHeads):
             
             # remove low scoring boxes
             inds = torch.where(scores > self.score_thresh)[0]
+            # inds = inds.to(torch.device('cuda'))
+            boxes = boxes.to(torch.device('cuda'))
+            boxes_cons = boxes_cons.to(torch.device('cuda'))
+            boxes_gt = boxes_gt.to(torch.device('cuda'))
+            labels = labels.to(torch.device('cuda'))
+            labels_gt = labels_gt.to(torch.device('cuda'))
             boxes, boxes_cons, boxes_gt, scores, labels, labels_gt = boxes[inds], boxes_cons[inds], boxes_gt[inds], scores[inds], labels[inds], labels_gt[inds] ##NEW
             boxes_in_feat, boxes_cons_in_feat, gt_boxes_in_feat = boxes_in_feat[inds], boxes_cons_in_feat[inds], gt_boxes_in_feat[inds] ##NEW
 

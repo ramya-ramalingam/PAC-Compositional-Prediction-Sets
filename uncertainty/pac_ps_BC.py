@@ -164,6 +164,7 @@ class PredSetConstructor_BC(PredSetConstructor):
         else:
             raise NotImplementedError
         
+        # T_opt = tc.tensor(np.inf)
         if error_permissive is None:
             T_opt = tc.tensor(np.inf)
         else:
