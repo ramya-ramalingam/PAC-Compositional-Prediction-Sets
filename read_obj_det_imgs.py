@@ -7,6 +7,9 @@ import torch
 
 MAX_WIDTH = 640
 MAX_HEIGHT = 480
+CLOSE = 50 # Within 50 pixel of another center means "close"
+PERSON_INDEX = 1
+CAR_INDEX = 3
 
 # Function to calculate area of a bounding box. Assumes input is tensor of the form 
 # [xmin, ymin, xmax, ymax]
@@ -24,12 +27,18 @@ def get_center(bbox):
     y_coord = (bbox[1].item() + bbox[3].item()) / 2
     return (x_coord, y_coord)
 
+# Function to return distance between two coordinates as tuples (x1, y1), (x2, y2)
+def get_dist(center1, center2):
+    xdist = np.abs(center1[0] - center2[0])
+    ydist = np.abs(center1[1] - center2[1])
+    return np.sqrt(xdist**2 + ydist**2)
+
 # For a given set of detections and ground truths, map each detection to a single ground truth 
 # (based on highest IoU value). 
 # Does not map detections which doesn't have an IOU >= min_IOU with any ground truth
 # Returns:  - a list of indices dt_to_gt. dt_to_gt[i] = j means the ith detection maps to the jth ground truth. 
 #           - a dictionary mapping each ground truth index to the set of detection indices mapped to it 
-def map_det_to_gt(det_list, gt_list, min_IOU):
+def map_det_to_gt(det_list, det_label_list, gt_list, gt_label_list, min_IOU):
     det_to_gt = list()
     gt_to_det_dict = defaultdict(list)
     # If there are no ground truths, let each detection map to the value -1. 
@@ -39,6 +48,9 @@ def map_det_to_gt(det_list, gt_list, min_IOU):
     for i, det_val in enumerate(det_list):
         curr_IoU_list = list()
         for j, gt_val in enumerate(gt_list):
+            # Only proceed if det and gt have same label
+            if det_label_list[i].item() != gt_label_list[j].item():
+                continue
             # Using Torchvision IoU
             det_tensor_list = torch.empty(1,4)
             gt_tensor_list = torch.empty(1, 4)
@@ -46,6 +58,10 @@ def map_det_to_gt(det_list, gt_list, min_IOU):
             gt_tensor_list[0] = gt_val
             currIoU = box_iou(det_tensor_list, gt_tensor_list)
             curr_IoU_list.append(currIoU.item())
+        # If current detection doesn't map to any ground truths
+        if (curr_IoU_list == []):
+            det_to_gt.append(-1)
+            continue
         maxIoU = np.max(curr_IoU_list)
         if (maxIoU < min_IOU):
             det_to_gt.append(-1) # Det not mapped to anything
@@ -123,7 +139,7 @@ def get_c_width(delta, residuals):
     return w
 
 def get_gt_to_det(img_result, min_IOU):
-    det_to_gt, gt_to_det_dict = map_det_to_gt(img_result['bbox_det_raw'], img_result['bbox_gt'], min_IOU)
+    det_to_gt, gt_to_det_dict = map_det_to_gt(img_result['bbox_det_raw'], img_result['label_det_raw'], img_result['bbox_gt'], img_result['label_gt'], min_IOU)
     # print(det_to_gt)
     # print(gt_to_det_dict)
     gt_to_det, chosen_dets = map_gt_to_det(img_result['bbox_gt'], gt_to_det_dict, img_result['score_det_raw'])
@@ -137,7 +153,7 @@ def is_small(bbox, area):
         return True
     else:
         return False
-
+    
 def get_left_images(bboxes, pixel_no):
     num_gt = 0
     for i, val in enumerate(bboxes):
@@ -170,6 +186,32 @@ def get_right_images(bboxes, pixel_no):
             num_gt += 1
     return num_gt
 
+def get_person_close_car(bboxes, labels, pixel_no):
+    num = 0
+    for i, val1 in enumerate(bboxes):
+        for j, val2 in enumerate(bboxes):
+            curr_center1 = get_center(val1)
+            curr_center2 = get_center(val2)
+            if labels[i].item() == PERSON_INDEX and labels[j].item() == CAR_INDEX:
+                # Check if centers are within pixel_no of each other
+                if get_dist(curr_center1, curr_center2) < pixel_no:
+                    num+=1
+    # Will count each pair once only because we require "i" index to be person and "j" index to be car
+    return num
+
+def get_person_left_of_car(bboxes, labels, pixel_no):
+    num = 0
+    for i, val1 in enumerate(bboxes):
+        for j, val2 in enumerate(bboxes):
+            curr_center1 = get_center(val1)
+            curr_center2 = get_center(val2)
+            if labels[i].item() == PERSON_INDEX and labels[j].item() == CAR_INDEX:
+                # Check if height is "close" and width is within pixel_no
+                if np.abs(curr_center1) < 0:
+                    pass
+    # INCOMPLETE
+    return num
+
 # Function which does everything done in main() - for imports
 def get_bounds(filename, min_IOU, delta):
     with open(filename, 'rb') as f:
@@ -184,16 +226,17 @@ def get_bounds(filename, min_IOU, delta):
     x = 0
     for i, val in enumerate(results):
 
-        if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
-            # print('No ground truths: ' + str(i))
-            unused_count += 1
-            continue
+        # Uncomment if you want to ignore elements with no ground truths 
+        # if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
+        #     # print('No ground truths: ' + str(i))
+        #     unused_count += 1
+        #     continue
     
         # 1. For each result, map every bounding box detection to a ground-truth bounding box. Do this on the basis of 
         #    IoU metric - Area of overlap / Area of union = Area of overlap / (Ground truth area + Predicted Box area - Area of overlap)
         #    https://learnopencv.com/intersection-over-union-iou-in-object-detection-and-segmentation/
 
-        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['bbox_gt'], min_IOU)
+        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['label_det_raw'], val['bbox_gt'], val['label_gt'], min_IOU)
 
         # 2. For each ground-truth g, there is now a set of predictions S which map to it. Among these, find the one with the highest
         #    confidence score, and map the ground-truth back to it. This is the corresponding "correct" bounding-box for that ground truth.
@@ -226,7 +269,41 @@ def get_bounds(filename, min_IOU, delta):
     hic_quantile = get_conformal_quantile(highest_inconfidence_list, bound_delta)
     return lc_quantile, hic_quantile
 
-def get_end_interval_w(filename, min_IOU, delta):
+
+def total_num_images(img):
+    # No. of ground truth detections in image
+    true_no = img['bbox_gt'].nelement() / 4
+    # Predicted number of image detections in image
+    predicted_no = img['bbox_det_raw'].nelement() / 4
+    return np.abs(true_no - predicted_no)
+
+def left_images(img, pixel_no):
+    true_no = get_left_images(img['bbox_gt'], pixel_no)
+    predicted_no = get_left_images(img['bbox_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+def bottom_images(img, pixel_no):
+    true_no = get_bottom_images(img['bbox_gt'], pixel_no)
+    predicted_no = get_bottom_images(img['bbox_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+def top_images(img, pixel_no):
+    true_no = get_top_images(img['bbox_gt'], pixel_no)
+    predicted_no = get_top_images(img['bbox_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+def right_images(img, pixel_no):
+    true_no = get_right_images(img['bbox_gt'], pixel_no)
+    predicted_no = get_right_images(img['bbox_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+def person_close_car(img, pixel_no):
+    true_no = get_person_close_car(img['bbox_gt'], img['label_gt'], pixel_no)
+    predicted_no = get_person_close_car(img['bbox_det_raw'], img['label_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+# Get end-interval width based on the non-conformity score defined by f
+def get_end_interval_w(filename, min_IOU, delta, fun):
     with open(filename, 'rb') as f:
         results = pickle.load(f)
     residuals = list()
@@ -234,13 +311,10 @@ def get_end_interval_w(filename, min_IOU, delta):
         if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
             continue
         # No. of ground truth detections in image
-        true_no = val['bbox_gt'].nelement() / 4
-        # Predicted number of image detections in image
-        predicted_no = val['bbox_det_raw'].nelement() / 4
-        residuals.append(np.abs(true_no - predicted_no))
+        new_residual = fun(val)
+        residuals.append(new_residual)
     w = get_c_width(delta, residuals)
     return w
-
 
 # Returns the maximum difference between x-coordinate / y-coordinate of a detection and its chosen ground truth for a given image
 # Used for generating prediction sets around the centers of detections 
@@ -267,7 +341,7 @@ def get_bbox_center_bounds(filename, min_IOU, delta):
     for i, val in enumerate(results):
         if val['bbox_gt'].nelement() == 0 and val['bbox_det_raw'].nelement() == 0:
             continue
-        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['bbox_gt'], min_IOU)
+        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['label_det_raw'], val['bbox_gt'], val['label_gt'], min_IOU)
         gt_to_det, chosen_dets = map_gt_to_det(val['bbox_gt'], gt_to_det_dict, val['score_det_raw'])
         chosen_dets_filled = fill_chosen_dets(chosen_dets, results[i]['bbox_det_raw'])
         max_width, max_height = get_max_width_and_height(chosen_dets_filled, det_to_gt, val['bbox_det_raw'], val['bbox_gt'])
@@ -305,11 +379,18 @@ def main():
             unused_count += 1
             continue
 
+        print('before label')
+        for i, label in enumerate(val['label_det_raw']):
+            print(label.item())
+            print(COCO_INSTANCE_CATEGORY_NAMES[label])
+        print('after label')
+        continue
+
         # 1. For each result, map every bounding box detection to a ground-truth bounding box. Do this on the basis of 
         #    IoU metric - Area of overlap / Area of union = Area of overlap / (Ground truth area + Predicted Box area - Area of overlap)
         #    https://learnopencv.com/intersection-over-union-iou-in-object-detection-and-segmentation/
 
-        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['bbox_gt'], min_IOU)
+        det_to_gt, gt_to_det_dict = map_det_to_gt(val['bbox_det_raw'], val['label_det_raw'], val['bbox_gt'], val['label_gt'], min_IOU)
 
         # 2. For each ground-truth g, there is now a set of predictions S which map to it. Among these, find the one with the highest
         #    confidence score, and map the ground-truth back to it. This is the corresponding "correct" bounding-box for that ground truth.

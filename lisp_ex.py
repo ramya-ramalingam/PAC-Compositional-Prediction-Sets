@@ -28,6 +28,9 @@ def get_grammar():
 
     return Grammar(rules, symb)
 
+def list_prod_fn(args, inp):
+    return [(a, b) for a in inp[0] for b in inp[1]]
+
 def map_fn(args, inp):
     f, xs = args
     return [f(x) for x in xs]
@@ -78,6 +81,9 @@ def get_fns():
         'apply': apply_fn,
         'curry': curry_fn,
 
+        # list functions
+        'list_prod': list_prod_fn,
+
         # functions
         'plus': plus_fn,
         'ge': ge_fn,
@@ -111,8 +117,10 @@ if __name__ == '__main__':
     print('{} total expressions'.format(len(exprs)))
     print()
 
-    # Parsing and 
-    program = '(fold plus (filter (curry ge 2) input) (fold plus input 0))'
+    # Parsing and Executing
+    # program = '(fold plus (filter (curry ge 2) input) (fold plus input 0))'
+    inp = ([1, 2, 3], [5, 6, 7])
+    program  = '(list_prod input)'
     expr = parse(program)
     outp = execute(expr, inp, fns)
     # outp, outp_dict = execute_with_intermediate_values(expr, inp, fns, dict())
