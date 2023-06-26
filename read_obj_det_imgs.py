@@ -206,10 +206,9 @@ def get_person_left_of_car(bboxes, labels, pixel_no):
             curr_center1 = get_center(val1)
             curr_center2 = get_center(val2)
             if labels[i].item() == PERSON_INDEX and labels[j].item() == CAR_INDEX:
-                # Check if height is "close" and width is within pixel_no
-                if np.abs(curr_center1) < 0:
-                    pass
-    # INCOMPLETE
+                # Check if person center is to the left of car center AND if centers are within pixel_no distance of each other
+                if curr_center1[0] < curr_center2[0] and get_dist(curr_center1, curr_center2) < pixel_no:
+                    num +=1
     return num
 
 # Function which does everything done in main() - for imports
@@ -300,6 +299,11 @@ def right_images(img, pixel_no):
 def person_close_car(img, pixel_no):
     true_no = get_person_close_car(img['bbox_gt'], img['label_gt'], pixel_no)
     predicted_no = get_person_close_car(img['bbox_det_raw'], img['label_det_raw'], pixel_no)
+    return np.abs(true_no - predicted_no)
+
+def person_left_car(img, pixel_no):
+    true_no = get_person_left_of_car(img['bbox_gt'], img['label_gt'], pixel_no)
+    predicted_no = get_person_left_of_car(img['bbox_det_raw'], img['label_det_raw'], pixel_no)
     return np.abs(true_no - predicted_no)
 
 # Get end-interval width based on the non-conformity score defined by f

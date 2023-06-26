@@ -1,4 +1,4 @@
-# Counting number of people + cars within 100 pixels of one another
+# Counting number of people to the right of a car within 100 pixels of it (centers)
 
 from lisp import *
 import lisp_ex as concrete
@@ -6,7 +6,7 @@ import lisp_ex_abs as abstract
 from test_helper import *
 from read_obj_det_imgs import get_bounds, get_end_interval_w, get_bbox_center_bounds, get_center, get_left_images, get_bottom_images, get_top_images, get_right_images
 from read_obj_det_imgs import left_images, bottom_images, top_images, right_images
-from read_obj_det_imgs import get_person_close_car, person_close_car
+from read_obj_det_imgs import get_person_left_of_car, person_left_car
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,7 +38,7 @@ def plotSorted(time, abstract, concrete, intersected):
     plt.legend()
     plt.title('Average interval length (propagated intervals): ' + str(np.average(abstract)) + '\n' +
               'Average interval length (intersected intervals): ' + str(np.average(intersected)))
-    plt.savefig('paper/intervalLengths/example3' +'.png', dpi=1200)
+    plt.savefig('paper/intervalLengths/example4' +'.png', dpi=1200)
 
 if __name__ == '__main__':
     # Basic set-up
@@ -50,22 +50,22 @@ if __name__ == '__main__':
     abstractFns = abstract.get_fns_abs()
     concFns = concrete.get_fns()
 
-    # Program to count number of people & cars within 100 pixels of each other (input is two lists - first of person detections, second of car detections) 
-    program = '(fold plus (map (curry f1 0) (filter (curry ge 100) (map tuple_dist (list_prod input)))) 0)'
+    # Program to count number of people & cars within 100 pixels of each other (with people to the left of the cars)
+    program = '(fold plus (map (curry f1 0) (filter (curry ge 100) (map tuple_dist (filter tuple_leq_x (list_prod input))))) 0)'
     expr = parse(program)
 
     pixels = 100
-    def curr_person_close_car(img):
-        return person_close_car(img, pixels)
+    def curr_person_left_car(img):
+        return person_left_car(img, pixels)
     
     new_delta = delta / 2
     lc_quantile, hic_quantile = get_bounds(filename_val, min_IOU, new_delta) # Both this and the next need to be correct 
     width_w, height_w = get_bbox_center_bounds(filename_val, min_IOU, new_delta)
-    w = get_end_interval_w(filename_val, min_IOU, delta, curr_person_close_car)
+    w = get_end_interval_w(filename_val, min_IOU, delta, curr_person_left_car)
 
     lc_quantile2, hic_quantile2 = get_bounds(filename_val, min_IOU, new_delta / 2)
     width_w2, height_w2 = get_bbox_center_bounds(filename_val, min_IOU, new_delta / 2)
-    w2 = get_end_interval_w(filename_val, min_IOU, delta / 2, curr_person_close_car)
+    w2 = get_end_interval_w(filename_val, min_IOU, delta / 2, curr_person_left_car)
 
     print("Lowest confidence: ", str(-1 * lc_quantile))
     print("Highest inconfidence: ", str(hic_quantile))
@@ -127,9 +127,9 @@ if __name__ == '__main__':
         abstractOutput2 = execute(expr, abs_input2, abstractFns)
         
         # True number of image detections to the left of image (within 100 pixels)
-        true_output = get_person_close_car(test['bbox_gt'], test['label_gt'], pixels)
+        true_output = get_person_left_of_car(test['bbox_gt'], test['label_gt'], pixels)
         # Predicted number of image detections to the left of image (within 100 pixels)
-        predicted_output = get_person_close_car(test['bbox_det_raw'], test['label_det_raw'], pixels)
+        predicted_output = get_person_left_of_car(test['bbox_det_raw'], test['label_det_raw'], pixels)
         if (true_output > 0):
             num_nonzero += 1
         true_labels.append(true_output)
@@ -160,8 +160,9 @@ if __name__ == '__main__':
     # Plotting true point output across test data
     plt.clf()
     plt.plot(time, true_labels, label = 'True point output', color = 'green')
-    plt.legend('Variance of true labels across test data')
-    plt.savefig('paper/trueOutput/example3.png', dpi=1200)
+    plt.legend()
+    plt.title('Variance of true labels across test data')
+    plt.savefig('paper/trueOutput/example4.png', dpi=1200)
 
     # Plotting uncertainty scores across test data
     ordered_indices = np.argsort(uncertainty_list)
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     plt.plot(time, ordered_uncertainty, label = 'Uncertainty', color = 'purple')
     plt.legend()
     plt.title('Variance of true labels across test data')
-    plt.savefig('paper/uncertaintyScores/example3_sorted.png', dpi=1200)
+    plt.savefig('paper/uncertaintyScores/example4_sorted.png', dpi=1200)
 
     # # Plot comparison in interval lengths between both methods
     plt.clf()
@@ -181,7 +182,7 @@ if __name__ == '__main__':
     plt.legend()
     plt.title('Average interval length (propagated intervals): ' + str(np.average(abstractIntervalLengths)) + '\n' +
               'Average interval length (intersected intervals): ' + str(np.average(intersectedIntervalLengths)))
-    plt.savefig('paper/intervalLengths/example3' +'.png', dpi=1200)
+    plt.savefig('paper/intervalLengths/example4' +'.png', dpi=1200)
 
     # Do the same, but ordered by intersected interval length (our method)
     plotSorted(time, abstractIntervalLengths, concreteIntervalLengths, intersectedIntervalLengths)
@@ -206,4 +207,4 @@ if __name__ == '__main__':
     plt.title('Marginal Coverage Comparison')
     # plt.ylim((0.2,1.05))
     plt.legend()
-    plt.savefig('paper/intervalCoverage/example3' +'.png', dpi=1200)
+    plt.savefig('paper/intervalCoverage/example4' +'.png', dpi=1200)
